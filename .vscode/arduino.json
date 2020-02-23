@@ -1,6 +1,7 @@
 {
-    "port": "COM5",
+    "port": "COM4",
     "board": "arduino:avr:nano",
     "configuration": "cpu=atmega328old",
-    "sketch": "ProjectorScreenControl.ino"
+    "sketch": "ProjectorScreenControl.ino",
+    "programmer": "AVRISP mkII"
 }

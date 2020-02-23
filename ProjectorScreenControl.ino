@@ -1,4 +1,5 @@
 #include <IRremote.h>
+
 const int IRReceiverPin = 11;
 IRrecv irrecv(IRReceiverPin);
 decode_results results;
@@ -14,28 +15,19 @@ bool AutoLiftingUp = false;
 bool LiftingUp = false;
 bool LiftingDown = false;
 bool CheckIdleTime = false;
-long ManualLiftingTimeOut = 250; // this var updates in methods isButtonUp() and isButtonDown()
-long TurningOnTimeOut = 10000;
-long IdleTimeOut = 60000;
+const long ManualSignalTimeOut = 150;
+const long TurningOnTimeOut = 10000;
+const long IdleTimeOut = 60000;
+const long EndStopChecks = 10;
 
-long PressTime;
 long TurningOnTime;
 long IdleTime;
+long EndStopPressMillis = 0;
+long EndStopCheckNumber = 0;
+long LastIrSignaMillis = 0;
 
-//bool Blink = false;
-//long BlinkTime = 0;
-//void BlinkWithoutDelay() {
-//	if (BlinkTime == 0)BlinkTime = millis();
-//	if (millis() - BlinkTime > 100)
-//	{
-//		Blink = !Blink;
-//		BlinkTime = 0;
-//	}
-//}
-
-void setup()
-{
-	//Serial.begin(9600);
+void setup() {
+	//Serial.begin(115200);
 	irrecv.enableIRIn(); // Start the receiver
 
 	pinMode(PowerPin, OUTPUT);
@@ -47,154 +39,111 @@ void setup()
 	TurnOffLifting();
 }
 
-void setRelayState(int relayPin, bool value)
-{
-	if (value)
-	{
+void setRelayState(int relayPin, bool value) {
+	if (value) {
 		digitalWrite(relayPin, LOW);
-	}
-	else
-	{
+	} else {
 		digitalWrite(relayPin, HIGH);
 	}
 }
 
-bool getRelayState(int relayPin)
-{
-	if (digitalRead(relayPin))
-	{
+bool getRelayState(int relayPin) {
+	if (digitalRead(relayPin)) {
 		return false;
-	}
-	else
-	{
+	} else {
 		return true;
 	}
 }
 
-bool isButtonOff(unsigned long value)
-{
-	bool result = value == 0xA32AB931
-		|| (value == 0x10EF38C7 && DeviceOn && !AutoLiftingUp);
+bool isButtonOff(unsigned long value) {
+  //                     fan                    projector
+	bool result = value == 0xA32AB931 || value == 0xC1AA9A65;
 
-	if (result)
-	{
+	if (result) {
 		OnAnyUserAction();
 	}
 
 	return result;
 }
 
-bool isButtonOn(unsigned long value)
-{
-	bool result = value == 0x143226DB
-		|| (value == 0x10EF38C7 && (!DeviceOn || AutoLiftingUp));
+bool isButtonOn(unsigned long value) {
+  //                     fan                    projector
+	bool result = value == 0x143226DB || value == 0xC1AA7A85;
 
-	if (result)
-	{
+	if (result) {
 		OnAnyUserAction();
 	}
 
 	return result;
 }
 
-bool isButtonMode(unsigned long value)
-{
-	bool result = value == 0x371A3C86 || value == 0x10EF20DF;
+bool isButtonMode(unsigned long value) {
+  //                     fan                    projector
+	bool result = value == 0x371A3C86 || value == 0xC1AADA25;
 
-	if (result)
-	{
+	if (result) {
 		OnAnyUserAction();
 	}
 
 	return result;
 }
 
-bool isButtonUp(unsigned long value)
-{
-	bool result = value == 0xE0984BB6 || value == 0x10EFB04F;
+bool isButtonUp(unsigned long value) {
+  //                     fan                    projector
+	bool result = value == 0xE0984BB6 || value == 0xC1AA5AA5;
 
-	if (result)
-	{
-		if (value == 0x10EFB04F)
-		{
-			ManualLiftingTimeOut = 350;
-		}
-		else if (value == 0xE0984BB6)
-		{
-			ManualLiftingTimeOut = 150;
-		}
-
+	if (result) {
 		OnAnyUserAction();
 	}
 
 	return result;
 }
 
-bool isButtonDown(unsigned long value)
-{
-	bool result = value == 0x39D41DC6 || value == 0x10EF08F7;
+bool isButtonDown(unsigned long value) {
+  //                     fan                    projector
+	bool result = value == 0x39D41DC6 || value == 0xC1AA3AC5;
 
-	if (result)
-	{
-		if (value == 0x10EF08F7)
-		{
-			ManualLiftingTimeOut = 350;
-		}
-		else if (value == 0x39D41DC6)
-		{
-			ManualLiftingTimeOut = 150;
-		}
-
+	if (result) {
 		OnAnyUserAction();
 	}
 
 	return result;
 }
 
-void OnAnyUserAction()
-{
-	if (DeviceOn)
-	{
+void OnAnyUserAction() {
+	if (DeviceOn) {
 		digitalWrite(PowerPin, !true);
 		IdleTime = millis();
 		CheckIdleTime = true;
 	}
 }
 
-void TurnOffLifting()
-{
+void TurnOffLifting() {
 	setRelayState(LiftingUpPin, false);
 	setRelayState(LiftingDownPin, false);
 }
 
-void StopAutoLiftDown()
-{
-	if (AutoLiftingDown)
-	{
+void StopAutoLiftDown() {
+	if (AutoLiftingDown) {
 		AutoLiftingDown = false;
 		TurnOffLifting();
 	}
 }
 
-void StopAutoLiftUp(bool turnOff = true)
-{
-	if (AutoLiftingUp)
-	{
+void StopAutoLiftUp(bool turnOff = true) {
+	if (AutoLiftingUp) {
 		AutoLiftingUp = false;
 		TurnOffLifting();
 
-		if (turnOff)
-		{
+		if (turnOff) {
 			DeviceOn = false;
 			digitalWrite(PowerPin, !false);
 		}
 	}
 }
 
-void AutoLiftDown()
-{
-	if (!AutoLiftingDown)
-	{
+void AutoLiftDown() {
+	if (!AutoLiftingDown) {
 		TurnOffLifting();
 		TurningOnTime = millis();
 		AutoLiftingUp = false;
@@ -203,137 +152,110 @@ void AutoLiftDown()
 	}
 }
 
-void AutoLiftUp()
-{
-	if (!AutoLiftingUp)
-	{
+void AutoLiftUp() {
+	if (!AutoLiftingUp) {
 		TurnOffLifting();
 
-		if (AutoLiftingDown)
-		{
+		if (AutoLiftingDown) {
 			delay(200);
 		}
 
 		AutoLiftingUp = true;
 		AutoLiftingDown = false;
 
-		if (IsTopPosition())
-		{
+		if (IsTopPosition()) {
 			StopAutoLiftUp();
-		}
-		else
-		{
+		} else {
 			setRelayState(LiftingUpPin, AutoLiftingUp);
 		}
 	}
 }
 
-bool IsTopPosition()
-{
-	if (getRelayState(LiftingUpPin))
-	{
-		if (analogRead(EndStopPin) == 0)
-		{
-			return true;
+bool IsTopPosition() {
+	if (getRelayState(LiftingUpPin)) {
+		int endStopValue = analogRead(EndStopPin);
+		//Serial.print("endStopValue = ");
+		//Serial.println(endStopValue, DEC);
+		if (endStopValue == 0) {
+			EndStopCheckNumber++;
+			return EndStopCheckNumber >= EndStopChecks;
+		} else {
+			EndStopCheckNumber = 0;
 		}
 	}
 
 	return false;
 }
 
-void ProcessSignal(unsigned long signal)
-{
+void ProcessSignal(unsigned long signal) {
 	//Serial.println(signal, HEX);
-	if (isButtonOff(signal) && DeviceOn)
-	{
+
+	if (isButtonOff(signal) && DeviceOn) { // off
 		AutoLiftUp();
 		delay(200);
-
 		return;
-	}
-	else if (isButtonOn(signal))
-	{
-		if (DeviceOn)
-		{
-			if (AutoLiftingUp)
-			{
+	} else if (isButtonOn(signal)) { // on
+		if (DeviceOn) {
+			if (AutoLiftingUp) {
 				StopAutoLiftUp(false);
 			}
-		}
-		else
-		{
+		} else {
 			DeviceOn = true;
 			digitalWrite(PowerPin, !true);
 			OnAnyUserAction();
 			AutoLiftDown();
 		}
-	}
-	else if (DeviceOn)
-	{
-		if (isButtonUp(signal))
-		{
-			StopAutoLiftDown();
-			StopAutoLiftUp(false);
-			
-			if (!LiftingUp)
-			{
-				setRelayState(LiftingUpPin, true);
-				LiftingUp = true;
-			}
-			
-			LiftingDown = false;
-			PressTime = millis();
-		}
-		else if (isButtonDown(signal))
-		{
+	} else if (DeviceOn) {
+		if (isButtonUp(signal)) { // up
 			StopAutoLiftDown();
 			StopAutoLiftUp(false);
 
-			if (!LiftingDown)
-			{
+			if (!LiftingUp) {
+				setRelayState(LiftingUpPin, true);
+        setRelayState(LiftingDownPin, false);
+				LiftingUp = true;
+			}
+
+			LiftingDown = false;
+		} else if (isButtonDown(signal)) { // down
+			StopAutoLiftDown();
+			StopAutoLiftUp(false);
+
+			if (!LiftingDown) {
+        setRelayState(LiftingUpPin, false);
 				setRelayState(LiftingDownPin, true);
 				LiftingDown = true;
 			}
 
 			LiftingUp = false;
-			PressTime = millis();
 		}
 	}
 }
 
 void loop() {
-	/*Serial.print(LiftingUp);
-	Serial.print(" : ");
-	Serial.println(analogRead(EndStopPin), DEC);*/
-
-	if (irrecv.decode(&results))
-	{
+	if (irrecv.decode( & results)) {
+    LastIrSignaMillis = millis();
 		ProcessSignal(results.value);
 		irrecv.resume();
 	}
 
-	if (LiftingUp || LiftingDown)
-	{
-		if ((millis() - PressTime > ManualLiftingTimeOut))
-		{
+	if (LiftingUp || LiftingDown) {
+		if ((millis() - LastIrSignaMillis > ManualSignalTimeOut)) {
 			LiftingUp = false;
 			LiftingDown = false;
 			TurnOffLifting();
 		}
 	}
 
-	if (AutoLiftingDown && millis() - TurningOnTime > TurningOnTimeOut)
-	{
+	if (AutoLiftingDown && millis() - TurningOnTime > TurningOnTimeOut) {
 		StopAutoLiftDown();
 	}
 
-	if (AutoLiftingUp && IsTopPosition())
-	{
+	if (AutoLiftingUp && IsTopPosition()) {
 		StopAutoLiftUp();
 	}
 
-	if (CheckIdleTime && (millis() - IdleTime > IdleTimeOut))
-	{
+	if (CheckIdleTime && (millis() - IdleTime > IdleTimeOut)) {
 		digitalWrite(PowerPin, !false);
 		CheckIdleTime = false;
 	}
