@@ -16,7 +16,7 @@ bool LiftingUp = false;
 bool LiftingDown = false;
 bool CheckIdleTime = false;
 const long ManualSignalTimeOut = 150;
-const long TurningOnTimeOut = 10000;
+const long TurningOnTimeOut = 10600;
 const long IdleTimeOut = 60000;
 const long EndStopChecks = 10;
 
